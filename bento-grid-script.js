@@ -1,6 +1,6 @@
 #target illustrator
 // This script creates a "Bento Grid" with cells that can span multiple rows/columns
-// Uses pixels as units and includes margin around the entire grid
+// Uses design principles for optimal spacing and corner radius
 
 function createBentoGrid() {
     // Check if Illustrator is running and a document is open
@@ -30,7 +30,35 @@ function createBentoGrid() {
     var artboardWidth = artboardRect[2] - artboardRect[0];
     var artboardHeight = artboardRect[1] - artboardRect[3];
     
-    // Dialog for user input
+    // --- Step 1: Spacing Style ---
+    var spacingInput = prompt(
+        "Choose spacing style:\n\n" +
+        "1 - Tight (2-3% gutter)\n" +
+        "2 - Comfortable (4-6% gutter) [RECOMMENDED]\n" +
+        "3 - Spacious (7-8% gutter)",
+        "2"
+    );
+    
+    if (spacingInput === null) {
+        doc.rulerUnits = originalRulerUnits;
+        return;
+    }
+    
+    var spacingStyle = parseInt(spacingInput, 10);
+    var gutterPercentage;
+    
+    switch (spacingStyle) {
+        case 1:
+            gutterPercentage = 2.5; // Tight: 2.5%
+            break;
+        case 3:
+            gutterPercentage = 7.5; // Spacious: 7.5%
+            break;
+        default:
+            gutterPercentage = 5; // Comfortable: 5%
+    }
+    
+    // --- Step 2: Grid Configuration ---
     var rowsInput = prompt("Enter the number of Rows:", "4");
     if (rowsInput === null) {
         doc.rulerUnits = originalRulerUnits;
@@ -43,20 +71,8 @@ function createBentoGrid() {
         return;
     }
     
-    var gutterInput = prompt("Enter the Gutter (Gap) Size (in pixels):", "16");
-    if (gutterInput === null) {
-        doc.rulerUnits = originalRulerUnits;
-        return;
-    }
-    
     var marginInput = prompt("Enter the Margin around the grid (in pixels):", "32");
     if (marginInput === null) {
-        doc.rulerUnits = originalRulerUnits;
-        return;
-    }
-    
-    var cornerRadiusInput = prompt("Enter the Corner Radius (in pixels):", "12");
-    if (cornerRadiusInput === null) {
         doc.rulerUnits = originalRulerUnits;
         return;
     }
@@ -69,15 +85,12 @@ function createBentoGrid() {
     
     var rows = parseInt(rowsInput, 10);
     var cols = parseInt(colsInput, 10);
-    var gutterSize = parseFloat(gutterInput);
     var margin = parseFloat(marginInput);
-    var cornerRadius = parseFloat(cornerRadiusInput);
     var cellCount = parseInt(cellCountInput, 10);
     
     // Validate inputs
     if (isNaN(rows) || rows < 1 || isNaN(cols) || cols < 1 || 
-        isNaN(gutterSize) || isNaN(margin) || margin < 0 || 
-        isNaN(cornerRadius) || cornerRadius < 0 || isNaN(cellCount) || cellCount < 1) {
+        isNaN(margin) || margin < 0 || isNaN(cellCount) || cellCount < 1) {
         alert("Invalid input. Please enter valid numbers.");
         doc.rulerUnits = originalRulerUnits;
         return;
@@ -87,6 +100,15 @@ function createBentoGrid() {
     var availableWidth = artboardWidth - (2 * margin);
     var availableHeight = artboardHeight - (2 * margin);
     
+    // Calculate base cell dimensions (without gutters first)
+    var baseCellWidth = availableWidth / cols;
+    var baseCellHeight = availableHeight / rows;
+    
+    // Calculate gutter based on smallest cell dimension and percentage
+    var smallestDimension = Math.min(baseCellWidth, baseCellHeight);
+    var gutterSize = Math.ceil(smallestDimension * (gutterPercentage / 100));
+    
+    // Recalculate with gutters
     var totalGutterWidth = gutterSize * (cols - 1);
     var totalGutterHeight = gutterSize * (rows - 1);
     
@@ -97,7 +119,7 @@ function createBentoGrid() {
     var cellHeight = totalCellAreaHeight / rows;
     
     if (cellWidth <= 0 || cellHeight <= 0) {
-        alert("Error: Grid doesn't fit. Reduce margins, gutters, rows, or columns.");
+        alert("Error: Grid doesn't fit. Reduce margins, rows, or columns.");
         doc.rulerUnits = originalRulerUnits;
         return;
     }
@@ -106,12 +128,8 @@ function createBentoGrid() {
     var startY = artboardRect[1] - margin;
     
     // --- Define Bento Grid Layout ---
-    // Each cell defined as: {row, col, rowSpan, colSpan}
     var cells = [];
-    
-    // Simple algorithm: create cells with varied spans
-    var cellIndex = 0;
-    var gridOccupied = []; // Track which grid positions are occupied
+    var gridOccupied = [];
     
     // Initialize grid tracking
     for (var r = 0; r < rows; r++) {
@@ -122,11 +140,11 @@ function createBentoGrid() {
     }
     
     // Place cells with varied spans
+    var cellIndex = 0;
     for (var r = 0; r < rows && cellIndex < cellCount; r++) {
         for (var c = 0; c < cols && cellIndex < cellCount; c++) {
             if (gridOccupied[r][c]) continue;
             
-            // Randomly decide span (with some logic)
             var colSpan = 1;
             var rowSpan = 1;
             
@@ -156,7 +174,6 @@ function createBentoGrid() {
                 if (!spanFits) break;
             }
             
-            // If span doesn't fit, use 1x1
             if (!spanFits) {
                 colSpan = 1;
                 rowSpan = 1;
@@ -189,6 +206,11 @@ function createBentoGrid() {
     cellColor.green = 245;
     cellColor.blue = 245;
     
+    var strokeColor = new RGBColor();
+    strokeColor.red = 226;
+    strokeColor.green = 232;
+    strokeColor.blue = 240;
+    
     // Draw each cell
     for (var i = 0; i < cells.length; i++) {
         var cell = cells[i];
@@ -198,6 +220,9 @@ function createBentoGrid() {
         
         var width = cell.colSpan * cellWidth + (cell.colSpan - 1) * gutterSize;
         var height = cell.rowSpan * cellHeight + (cell.rowSpan - 1) * gutterSize;
+        
+        // iOS/Apple formula for corner radius: √(width × height) / 10, rounded up
+        var cornerRadius = Math.ceil(Math.sqrt(width * height) / 10);
         
         // Create rounded rectangle
         var rect = doc.layers[0].pathItems.roundedRectangle(
@@ -212,11 +237,6 @@ function createBentoGrid() {
         rect.filled = true;
         rect.fillColor = cellColor;
         rect.stroked = true;
-        
-        var strokeColor = new RGBColor();
-        strokeColor.red = 226;
-        strokeColor.green = 232;
-        strokeColor.blue = 240;
         rect.strokeColor = strokeColor;
         rect.strokeWidth = 2;
         
@@ -228,7 +248,12 @@ function createBentoGrid() {
     
     doc.rulerUnits = originalRulerUnits;
     
-    alert("Successfully created a Bento Grid with " + cells.length + " cells!");
+    var summary = "Successfully created a Bento Grid!\n\n" +
+                  "Cells: " + cells.length + "\n" +
+                  "Gutter: " + gutterSize + "px (" + gutterPercentage + "%)\n" +
+                  "Grid: " + cols + "×" + rows;
+    
+    alert(summary);
 }
 
 // Run the main function
