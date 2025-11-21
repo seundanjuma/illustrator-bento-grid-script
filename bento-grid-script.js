@@ -1,5 +1,5 @@
 #target illustrator
-// This script creates a "Bento Grid" with rounded rectangles that can overlap
+// This script creates a "Bento Grid" with cells that can span multiple rows/columns
 // Uses pixels as units and includes margin around the entire grid
 
 function createBentoGrid() {
@@ -25,13 +25,13 @@ function createBentoGrid() {
     var activeArtboardIndex = doc.artboards.getActiveArtboardIndex();
     var artboard = doc.artboards[activeArtboardIndex];
     
-    // Get the artboard dimensions (ArtboardRect: [left, top, right, bottom])
+    // Get the artboard dimensions
     var artboardRect = artboard.artboardRect;
     var artboardWidth = artboardRect[2] - artboardRect[0];
     var artboardHeight = artboardRect[1] - artboardRect[3];
     
     // Dialog for user input
-    var rowsInput = prompt("Enter the number of Rows:", "3");
+    var rowsInput = prompt("Enter the number of Rows:", "4");
     if (rowsInput === null) {
         doc.rulerUnits = originalRulerUnits;
         return;
@@ -43,26 +43,26 @@ function createBentoGrid() {
         return;
     }
     
-    var gutterInput = prompt("Enter the Gutter (Gap) Size (in pixels):", "12");
+    var gutterInput = prompt("Enter the Gutter (Gap) Size (in pixels):", "16");
     if (gutterInput === null) {
         doc.rulerUnits = originalRulerUnits;
         return;
     }
     
-    var marginInput = prompt("Enter the Margin around the grid (in pixels):", "24");
+    var marginInput = prompt("Enter the Margin around the grid (in pixels):", "32");
     if (marginInput === null) {
         doc.rulerUnits = originalRulerUnits;
         return;
     }
     
-    var cornerRadiusInput = prompt("Enter the Corner Radius for rounded rectangles (in pixels):", "16");
+    var cornerRadiusInput = prompt("Enter the Corner Radius (in pixels):", "12");
     if (cornerRadiusInput === null) {
         doc.rulerUnits = originalRulerUnits;
         return;
     }
     
-    var overlapInput = prompt("Enter the Overlap amount (in pixels, negative for gap):", "-6");
-    if (overlapInput === null) {
+    var cellCountInput = prompt("How many cells do you want?", "7");
+    if (cellCountInput === null) {
         doc.rulerUnits = originalRulerUnits;
         return;
     }
@@ -72,108 +72,163 @@ function createBentoGrid() {
     var gutterSize = parseFloat(gutterInput);
     var margin = parseFloat(marginInput);
     var cornerRadius = parseFloat(cornerRadiusInput);
-    var overlap = parseFloat(overlapInput);
+    var cellCount = parseInt(cellCountInput, 10);
     
     // Validate inputs
     if (isNaN(rows) || rows < 1 || isNaN(cols) || cols < 1 || 
         isNaN(gutterSize) || isNaN(margin) || margin < 0 || 
-        isNaN(cornerRadius) || cornerRadius < 0 || isNaN(overlap)) {
+        isNaN(cornerRadius) || cornerRadius < 0 || isNaN(cellCount) || cellCount < 1) {
         alert("Invalid input. Please enter valid numbers.");
         doc.rulerUnits = originalRulerUnits;
         return;
     }
     
-    // --- Calculation ---
-    // Available space after margins
+    // --- Grid Calculation ---
     var availableWidth = artboardWidth - (2 * margin);
     var availableHeight = artboardHeight - (2 * margin);
     
-    // Effective gutter size (gutter + overlap adjustment)
-    var effectiveGutter = gutterSize + overlap;
+    var totalGutterWidth = gutterSize * (cols - 1);
+    var totalGutterHeight = gutterSize * (rows - 1);
     
-    // Total space taken up by gutters
-    var totalGutterWidth = effectiveGutter * (cols - 1);
-    var totalGutterHeight = effectiveGutter * (rows - 1);
-    
-    // Total space available for cells
     var totalCellAreaWidth = availableWidth - totalGutterWidth;
     var totalCellAreaHeight = availableHeight - totalGutterHeight;
     
-    // Individual cell dimensions
     var cellWidth = totalCellAreaWidth / cols;
     var cellHeight = totalCellAreaHeight / rows;
     
-    // Check if cells have valid dimensions
     if (cellWidth <= 0 || cellHeight <= 0) {
         alert("Error: Grid doesn't fit. Reduce margins, gutters, rows, or columns.");
         doc.rulerUnits = originalRulerUnits;
         return;
     }
     
-    // --- Preview Dialog ---
-    var previewMsg = "PREVIEW:\n\n";
-    previewMsg += "Artboard: " + Math.round(artboardWidth) + "×" + Math.round(artboardHeight) + "px\n";
-    previewMsg += "Grid: " + rows + " rows × " + cols + " columns\n";
-    previewMsg += "Margin: " + margin + "px\n";
-    previewMsg += "Gutter: " + gutterSize + "px\n";
-    previewMsg += "Overlap: " + overlap + "px\n";
-    previewMsg += "Corner Radius: " + cornerRadius + "px\n\n";
-    previewMsg += "Each cell: " + Math.round(cellWidth) + "×" + Math.round(cellHeight) + "px\n\n";
-    previewMsg += "Create this grid?";
-    
-    if (!confirm(previewMsg)) {
-        doc.rulerUnits = originalRulerUnits;
-        return;
-    }
-    
-    // --- Drawing the Grid ---
-    // Create a new group item to hold all the grid cells
-    var gridGroup = doc.layers[0].groupItems.add();
-    gridGroup.name = "Bento Grid (" + cols + "×" + rows + ")";
-    
-    // Set up basic cell appearance
-    var cellColor = new RGBColor();
-    cellColor.red = 230;
-    cellColor.green = 230;
-    cellColor.blue = 240;
-    
-    // Store the grid's top-left corner (accounting for margin)
     var startX = artboardRect[0] + margin;
     var startY = artboardRect[1] - margin;
     
-    // Draw grid cells
+    // --- Define Bento Grid Layout ---
+    // Each cell defined as: {row, col, rowSpan, colSpan}
+    var cells = [];
+    
+    // Simple algorithm: create cells with varied spans
+    var cellIndex = 0;
+    var gridOccupied = []; // Track which grid positions are occupied
+    
+    // Initialize grid tracking
     for (var r = 0; r < rows; r++) {
+        gridOccupied[r] = [];
         for (var c = 0; c < cols; c++) {
-            // Calculate position of the top-left corner of the current cell
-            var xPos = startX + c * (cellWidth + effectiveGutter);
-            var yPos = startY - r * (cellHeight + effectiveGutter);
-            
-            // Create rounded rectangle
-            var rect = gridGroup.pathItems.roundedRectangle(
-                yPos,          // top
-                xPos,          // left
-                cellWidth,     // width
-                cellHeight,    // height
-                cornerRadius,  // horizontal corner radius
-                cornerRadius   // vertical corner radius
-            );
-            
-            // Apply styling
-            rect.filled = true;
-            rect.fillColor = cellColor;
-            rect.stroked = false;
+            gridOccupied[r][c] = false;
         }
     }
     
-    // Select the newly created group
+    // Place cells with varied spans
+    for (var r = 0; r < rows && cellIndex < cellCount; r++) {
+        for (var c = 0; c < cols && cellIndex < cellCount; c++) {
+            if (gridOccupied[r][c]) continue;
+            
+            // Randomly decide span (with some logic)
+            var colSpan = 1;
+            var rowSpan = 1;
+            
+            // Every 3rd or 4th cell gets a wider span
+            if ((cellIndex + 1) % 3 === 0 || (cellIndex + 1) % 4 === 0) {
+                if (c + 1 < cols && !gridOccupied[r][c + 1]) {
+                    colSpan = 2;
+                }
+            }
+            
+            // Some cells get taller
+            if ((cellIndex + 1) % 5 === 0) {
+                if (r + 1 < rows && !gridOccupied[r + 1][c]) {
+                    rowSpan = 2;
+                }
+            }
+            
+            // Verify the span fits
+            var spanFits = true;
+            for (var sr = r; sr < r + rowSpan && sr < rows; sr++) {
+                for (var sc = c; sc < c + colSpan && sc < cols; sc++) {
+                    if (gridOccupied[sr][sc]) {
+                        spanFits = false;
+                        break;
+                    }
+                }
+                if (!spanFits) break;
+            }
+            
+            // If span doesn't fit, use 1x1
+            if (!spanFits) {
+                colSpan = 1;
+                rowSpan = 1;
+            }
+            
+            // Mark grid as occupied
+            for (var sr = r; sr < r + rowSpan; sr++) {
+                for (var sc = c; sc < c + colSpan; sc++) {
+                    gridOccupied[sr][sc] = true;
+                }
+            }
+            
+            cells.push({
+                row: r,
+                col: c,
+                rowSpan: rowSpan,
+                colSpan: colSpan
+            });
+            
+            cellIndex++;
+        }
+    }
+    
+    // --- Drawing the Grid ---
+    var gridGroup = doc.layers[0].groupItems.add();
+    gridGroup.name = "Bento Grid (" + cols + "×" + rows + ")";
+    
+    var cellColor = new RGBColor();
+    cellColor.red = 245;
+    cellColor.green = 245;
+    cellColor.blue = 245;
+    
+    // Draw each cell
+    for (var i = 0; i < cells.length; i++) {
+        var cell = cells[i];
+        
+        var xPos = startX + cell.col * (cellWidth + gutterSize);
+        var yPos = startY - cell.row * (cellHeight + gutterSize);
+        
+        var width = cell.colSpan * cellWidth + (cell.colSpan - 1) * gutterSize;
+        var height = cell.rowSpan * cellHeight + (cell.rowSpan - 1) * gutterSize;
+        
+        // Create rounded rectangle
+        var rect = doc.layers[0].pathItems.roundedRectangle(
+            yPos,
+            xPos,
+            width,
+            height,
+            cornerRadius,
+            cornerRadius
+        );
+        
+        rect.filled = true;
+        rect.fillColor = cellColor;
+        rect.stroked = true;
+        
+        var strokeColor = new RGBColor();
+        strokeColor.red = 226;
+        strokeColor.green = 232;
+        strokeColor.blue = 240;
+        rect.strokeColor = strokeColor;
+        rect.strokeWidth = 2;
+        
+        rect.move(gridGroup, ElementPlacement.PLACEATEND);
+    }
+    
     gridGroup.selected = true;
     app.redraw();
     
-    // Restore original ruler units
     doc.rulerUnits = originalRulerUnits;
     
-    // Success Message
-    alert("Successfully created a " + rows + "×" + cols + " Bento Grid!");
+    alert("Successfully created a Bento Grid with " + cells.length + " cells!");
 }
 
 // Run the main function
