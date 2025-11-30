@@ -33,6 +33,22 @@ function createBentoGrid() {
     var startY = bounds[1];
     var containerLayer = selectedItem.layer;
     
+    function encodeSettings(rows, cols, spacing, margin, patternSeed) {
+        var combined = (rows << 24) | (cols << 20) | (spacing << 18) | (margin << 8) | (patternSeed & 0xFF);
+        return combined.toString(16).toUpperCase();
+    }
+    
+    function decodeSettings(hexCode) {
+        var combined = parseInt(hexCode, 16);
+        return {
+            rows: (combined >> 24) & 0xFF,
+            cols: (combined >> 20) & 0x0F,
+            spacing: (combined >> 18) & 0x03,
+            margin: (combined >> 8) & 0x3FF,
+            patternSeed: combined & 0xFF
+        };
+    }
+    
     var dialog = new Window("dialog", "Bento Grid Settings");
     dialog.alignChildren = "fill";
     
@@ -43,8 +59,11 @@ function createBentoGrid() {
     var seedInputGroup = seedGroup.add("group");
     seedInputGroup.add("statictext", undefined, "Import Seed:");
     var seedInput = seedInputGroup.add("edittext", undefined, "");
-    seedInput.characters = 10;
+    seedInput.characters = 15;
     seedGroup.add("statictext", undefined, "Leave blank for random layout");
+    
+    var applyBtn = seedGroup.add("button", undefined, "Apply Seed");
+    applyBtn.enabled = false;
     
     var spacingGroup = dialog.add("panel", undefined, "Spacing Style");
     spacingGroup.alignChildren = "left";
@@ -79,18 +98,55 @@ function createBentoGrid() {
     var okButton = buttonGroup.add("button", undefined, "Continue to Preview", {name: "ok"});
     var cancelButton = buttonGroup.add("button", undefined, "Cancel", {name: "cancel"});
     
+    seedInput.onChange = function() {
+        var inputText = seedInput.text.replace(/\s/g, "");
+        applyBtn.enabled = inputText.length > 0;
+    };
+    
+    applyBtn.onClick = function() {
+        var hexCode = seedInput.text.replace(/\s/g, "");
+        if (hexCode.length === 0) return;
+        
+        try {
+            var settings = decodeSettings(hexCode);
+            
+            if (settings.rows > 0 && settings.rows <= 20 && 
+                settings.cols > 0 && settings.cols <= 20 && 
+                settings.margin >= 0 && settings.margin <= 200) {
+                
+                rowsInput.text = settings.rows.toString();
+                colsInput.text = settings.cols.toString();
+                marginInput.text = settings.margin.toString();
+                
+                spacingRadio1.value = (settings.spacing === 1);
+                spacingRadio2.value = (settings.spacing === 2);
+                spacingRadio3.value = (settings.spacing === 3);
+                
+                if (!spacingRadio1.value && !spacingRadio2.value && !spacingRadio3.value) {
+                    spacingRadio2.value = true;
+                }
+            }
+        } catch (e) {
+            alert("Invalid seed code. Please check and try again.");
+        }
+    };
+    
     if (dialog.show() === 2) {
         doc.rulerUnits = originalRulerUnits;
         return;
     }
     
     var gutterPercentage;
+    var spacingCode;
     if (spacingRadio1.value) {
         gutterPercentage = 2.5;
+        spacingCode = 1;
     } else if (spacingRadio3.value) {
         gutterPercentage = 7.5;
+        spacingCode = 3;
     } else {
         gutterPercentage = 5;
+        spacingCode = 2;
     }
     
     var rows = parseInt(rowsInput.text, 10);
@@ -132,12 +188,17 @@ function createBentoGrid() {
     var gridStartY = startY - margin;
     
     var importedSeed = seedInput.text.replace(/\s/g, "");
-    var currentSeed;
+    var patternSeed;
     
-    if (importedSeed !== "" && !isNaN(parseInt(importedSeed, 10))) {
-        currentSeed = parseInt(importedSeed, 10);
+    if (importedSeed !== "" && importedSeed.length > 0) {
+        try {
+            var decodedSettings = decodeSettings(importedSeed);
+            patternSeed = decodedSettings.patternSeed;
+        } catch (e) {
+            patternSeed = Math.floor(Math.random() * 256);
+        }
     } else {
-        currentSeed = Math.floor(Math.random() * 1000);
+        patternSeed = Math.floor(Math.random() * 256);
     }
     
     function generateLayout(seed) {
@@ -268,9 +329,9 @@ function createBentoGrid() {
         return gridGroup;
     }
     
-    var seedHistory = [currentSeed];
+    var seedHistory = [patternSeed];
     var historyIndex = 0;
-    var currentLayout = generateLayout(currentSeed);
+    var currentLayout = generateLayout(patternSeed);
     var currentPreview = drawGrid(currentLayout);
     app.redraw();
     
@@ -351,44 +412,47 @@ function createBentoGrid() {
             
             if (historyIndex < seedHistory.length - 1) {
                 historyIndex++;
-                currentSeed = seedHistory[historyIndex];
+                patternSeed = seedHistory[historyIndex];
             } else {
-                currentSeed += 17;
+                patternSeed = (patternSeed + 17) % 256;
                 historyIndex++;
-                seedHistory[historyIndex] = currentSeed;
+                seedHistory[historyIndex] = patternSeed;
             }
             
-            currentLayout = generateLayout(currentSeed);
+            currentLayout = generateLayout(patternSeed);
             currentPreview = drawGrid(currentLayout);
             app.redraw();
         } else if (action === 3) {
             currentPreview.remove();
-            currentSeed = Math.floor(Math.random() * 1000);
+            patternSeed = Math.floor(Math.random() * 256);
             historyIndex++;
-            seedHistory[historyIndex] = currentSeed;
+            seedHistory[historyIndex] = patternSeed;
             seedHistory.length = historyIndex + 1;
-            currentLayout = generateLayout(currentSeed);
+            currentLayout = generateLayout(patternSeed);
             currentPreview = drawGrid(currentLayout);
             app.redraw();
         } else if (action === 4) {
             currentPreview.remove();
             historyIndex--;
-            currentSeed = seedHistory[historyIndex];
-            currentLayout = generateLayout(currentSeed);
+            patternSeed = seedHistory[historyIndex];
+            currentLayout = generateLayout(patternSeed);
             currentPreview = drawGrid(currentLayout);
             app.redraw();
         } else if (action === 5) {
+            var fullSeed = encodeSettings(rows, cols, spacingCode, margin, patternSeed);
+            
             var seedDialog = new Window("dialog", "Export Seed");
             seedDialog.alignChildren = "center";
             seedDialog.margins = 20;
             
             seedDialog.add("statictext", undefined, "Current Layout Seed:");
             
-            var seedText = seedDialog.add("edittext", undefined, currentSeed.toString());
-            seedText.characters = 15;
+            var seedText = seedDialog.add("edittext", undefined, fullSeed);
+            seedText.characters = 20;
             seedText.active = true;
             
-            seedDialog.add("statictext", undefined, "Copy this number to recreate this exact layout later.");
+            seedDialog.add("statictext", undefined, "Copy this code to recreate this exact layout later.");
+            seedDialog.add("statictext", undefined, "This seed contains all grid settings and the layout pattern.");
             
             var okBtn = seedDialog.add("button", undefined, "OK", {name: "ok"});
             
@@ -399,12 +463,14 @@ function createBentoGrid() {
     app.redraw();
     doc.rulerUnits = originalRulerUnits;
     
+    var fullSeed = encodeSettings(rows, cols, spacingCode, margin, patternSeed);
+    
     var summary = "Successfully created a Bento Grid!\n\n" +
                   "Cells: " + currentLayout.length + "\n" +
                   "Gutter: " + gutterSize + "px (" + gutterPercentage + "%)\n" +
                   "Corner Radius: " + cornerRadius + "px\n" +
                   "Grid: " + cols + " x " + rows + "\n" +
-                  "Seed: " + currentSeed;
+                  "Seed: " + fullSeed;
     
     alert(summary);
 }
