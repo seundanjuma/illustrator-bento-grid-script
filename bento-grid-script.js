@@ -248,6 +248,8 @@ function createBentoGrid() {
     }
     
     var currentSeed = Math.floor(Math.random() * 1000);
+    var seedHistory = [currentSeed];
+    var historyIndex = 0;
     var currentLayout = generateLayout(currentSeed);
     var currentPreview = drawGrid(currentLayout);
     app.redraw();
@@ -266,14 +268,18 @@ function createBentoGrid() {
         btnGroup.orientation = "row";
         btnGroup.spacing = 10;
         
-        var useBtn = btnGroup.add("button", undefined, "Use This Layout");
-        useBtn.preferredSize = [130, 35];
+        var prevBtn = btnGroup.add("button", undefined, "← Previous");
+        prevBtn.preferredSize = [100, 35];
+        prevBtn.enabled = historyIndex > 0;
         
-        var nextBtn = btnGroup.add("button", undefined, "Show Next");
-        nextBtn.preferredSize = [130, 35];
+        var nextBtn = btnGroup.add("button", undefined, "Next →");
+        nextBtn.preferredSize = [100, 35];
         
         var regenBtn = btnGroup.add("button", undefined, "Regenerate");
-        regenBtn.preferredSize = [130, 35];
+        regenBtn.preferredSize = [100, 35];
+        
+        var useBtn = btnGroup.add("button", undefined, "Use This Layout");
+        useBtn.preferredSize = [130, 35];
         
         var cancelBtn = previewDialog.add("button", undefined, "Cancel", {name: "cancel"});
         
@@ -294,6 +300,11 @@ function createBentoGrid() {
             previewDialog.close();
         };
         
+        prevBtn.onClick = function() {
+            action = 4;
+            previewDialog.close();
+        };
+        
         var result = previewDialog.show();
         
         if (result === 2 || action === 0) {
@@ -309,13 +320,32 @@ function createBentoGrid() {
             keepGoing = false;
         } else if (action === 2) {
             currentPreview.remove();
-            currentSeed += 17;
+            
+            if (historyIndex < seedHistory.length - 1) {
+                historyIndex++;
+                currentSeed = seedHistory[historyIndex];
+            } else {
+                currentSeed += 17;
+                historyIndex++;
+                seedHistory[historyIndex] = currentSeed;
+            }
+            
             currentLayout = generateLayout(currentSeed);
             currentPreview = drawGrid(currentLayout);
             app.redraw();
         } else if (action === 3) {
             currentPreview.remove();
             currentSeed = Math.floor(Math.random() * 1000);
+            historyIndex++;
+            seedHistory[historyIndex] = currentSeed;
+            seedHistory.length = historyIndex + 1;
+            currentLayout = generateLayout(currentSeed);
+            currentPreview = drawGrid(currentLayout);
+            app.redraw();
+        } else if (action === 4) {
+            currentPreview.remove();
+            historyIndex--;
+            currentSeed = seedHistory[historyIndex];
             currentLayout = generateLayout(currentSeed);
             currentPreview = drawGrid(currentLayout);
             app.redraw();
