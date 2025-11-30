@@ -52,17 +52,21 @@ the spacing and corner radius follow actual design principles:
 
 ## what are seeds?
 
-think of a seed as a unique recipe number for your grid layout. the script generates different arrangements of cells randomly, but each arrangement has a unique number (the seed).
+seeds are hex codes that contain your entire grid recipe - not just the layout pattern, but all the settings too (rows, columns, spacing style, and margin).
+
+**how it works:**
+- you create a grid you love
+- click "export seed" and get a hex code like `4A3C2F1B`
+- paste that code into "import seed" later
+- click "apply seed" and watch all your settings auto-fill
+- you get the exact same grid, every time
 
 **why this matters:**
-- you find a layout you love
-- click "export seed" and you get a number like `847`
-- later, you can paste `847` into "import seed" and get the exact same layout again
-- save seeds for your favorite layouts or share them with your team to generate consistent bentos across projects
+- save seeds for layouts you use frequently
+- share seeds with your team to maintain consistent bento grids across projects
+- no need to remember or document all the settings - the seed contains everything
 
 **example:**
-- create a 4x3 grid with seed `123` → you get a specific arrangement
-- create another 4x3 grid with seed `123` → you get the same arrangement
-- create a 4x3 grid with seed `456` → you get a different arrangement
-
-seeds only work with the same grid settings (same rows, columns, spacing). changing those settings with the same seed will give you a different result.
+- seed `4A3C2F1B` might give you a 4x3 grid with comfortable spacing, 32px margin, and a specific arrangement
+- anyone on your team can paste `4A3C2F1B` and get the exact same result
+- change any setting after importing if you want to tweak it
