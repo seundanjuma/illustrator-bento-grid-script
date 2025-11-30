@@ -1,4 +1,6 @@
 #target illustrator
+// Bento Grid Generator for Adobe Illustrator
+// Created by @mrkazuda (x.com/mrkazuda)
 
 function createBentoGrid() {
     if (app.documents.length === 0) {
