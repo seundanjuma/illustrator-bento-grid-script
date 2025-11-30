@@ -34,6 +34,16 @@ function createBentoGrid() {
     var dialog = new Window("dialog", "Bento Grid Settings");
     dialog.alignChildren = "fill";
     
+    var seedGroup = dialog.add("panel", undefined, "Seed (Optional)");
+    seedGroup.alignChildren = "left";
+    seedGroup.margins = 15;
+    
+    var seedInputGroup = seedGroup.add("group");
+    seedInputGroup.add("statictext", undefined, "Import Seed:");
+    var seedInput = seedInputGroup.add("edittext", undefined, "");
+    seedInput.characters = 10;
+    seedGroup.add("statictext", undefined, "Leave blank for random layout");
+    
     var spacingGroup = dialog.add("panel", undefined, "Spacing Style");
     spacingGroup.alignChildren = "left";
     spacingGroup.margins = 15;
@@ -118,6 +128,15 @@ function createBentoGrid() {
     var cornerRadius = Math.ceil(Math.sqrt(cellWidth * cellHeight) / 10);
     var gridStartX = startX + margin;
     var gridStartY = startY - margin;
+    
+    var importedSeed = seedInput.text.replace(/\s/g, "");
+    var currentSeed;
+    
+    if (importedSeed !== "" && !isNaN(parseInt(importedSeed, 10))) {
+        currentSeed = parseInt(importedSeed, 10);
+    } else {
+        currentSeed = Math.floor(Math.random() * 1000);
+    }
     
     function generateLayout(seed) {
         var cells = [];
@@ -247,7 +266,6 @@ function createBentoGrid() {
         return gridGroup;
     }
     
-    var currentSeed = Math.floor(Math.random() * 1000);
     var seedHistory = [currentSeed];
     var historyIndex = 0;
     var currentLayout = generateLayout(currentSeed);
@@ -268,15 +286,18 @@ function createBentoGrid() {
         btnGroup.orientation = "row";
         btnGroup.spacing = 10;
         
-        var prevBtn = btnGroup.add("button", undefined, "← Previous");
+        var prevBtn = btnGroup.add("button", undefined, "Previous");
         prevBtn.preferredSize = [100, 35];
         prevBtn.enabled = historyIndex > 0;
         
-        var nextBtn = btnGroup.add("button", undefined, "Next →");
+        var nextBtn = btnGroup.add("button", undefined, "Next");
         nextBtn.preferredSize = [100, 35];
         
         var regenBtn = btnGroup.add("button", undefined, "Regenerate");
         regenBtn.preferredSize = [100, 35];
+        
+        var exportBtn = btnGroup.add("button", undefined, "Export Seed");
+        exportBtn.preferredSize = [100, 35];
         
         var useBtn = btnGroup.add("button", undefined, "Use This Layout");
         useBtn.preferredSize = [130, 35];
@@ -302,6 +323,11 @@ function createBentoGrid() {
         
         prevBtn.onClick = function() {
             action = 4;
+            previewDialog.close();
+        };
+        
+        exportBtn.onClick = function() {
+            action = 5;
             previewDialog.close();
         };
         
@@ -349,6 +375,22 @@ function createBentoGrid() {
             currentLayout = generateLayout(currentSeed);
             currentPreview = drawGrid(currentLayout);
             app.redraw();
+        } else if (action === 5) {
+            var seedDialog = new Window("dialog", "Export Seed");
+            seedDialog.alignChildren = "center";
+            seedDialog.margins = 20;
+            
+            seedDialog.add("statictext", undefined, "Current Layout Seed:");
+            
+            var seedText = seedDialog.add("edittext", undefined, currentSeed.toString());
+            seedText.characters = 15;
+            seedText.active = true;
+            
+            seedDialog.add("statictext", undefined, "Copy this number to recreate this exact layout later.");
+            
+            var okBtn = seedDialog.add("button", undefined, "OK", {name: "ok"});
+            
+            seedDialog.show();
         }
     }
     
@@ -359,7 +401,8 @@ function createBentoGrid() {
                   "Cells: " + currentLayout.length + "\n" +
                   "Gutter: " + gutterSize + "px (" + gutterPercentage + "%)\n" +
                   "Corner Radius: " + cornerRadius + "px\n" +
-                  "Grid: " + cols + "×" + rows;
+                  "Grid: " + cols + " x " + rows + "\n" +
+                  "Seed: " + currentSeed;
     
     alert(summary);
 }
